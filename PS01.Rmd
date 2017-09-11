@@ -1,12 +1,13 @@
 ---
 title: "STAT/MATH 495: Problem Set 01"
-author: "WRITE YOUR NAME HERE"
+author: "Brendan Seto"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
   html_document:
     toc: true
     toc_float: true
     toc_depth: 2
+    code_folding: hide
     collapsed: false
     smooth_scroll: false
 ---
@@ -15,7 +16,80 @@ output:
 knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4.5)
 
 # Load packages
+library(mosaic)
 library(tidyverse)
+library(pander)
+```
+
+```{r, include=FALSE}
+train <- read_csv("https://rudeboybert.github.io/STAT495/static/Titanic/train.csv")
+test <- read_csv("https://rudeboybert.github.io/STAT495/static/Titanic/test.csv")
+submission <- read_csv("https://rudeboybert.github.io/STAT495/static/Titanic/gender_submission.csv")
+```
+
+# Intro
+
+*Goals:* Learn how to sumbit!
+
+*Secondary:* Make a simple model
+
+## Primary Aim
+
+Nothing that I actually have to do here
+
+## Secondary Aim
+
+### Make Models
+
+##### First look at variable names
+```{r}
+pander(names(train))
+```
+
+##### Model with all
+
+First I ran a logistic regresison model with all the non-unique variables.  Here's a summary.  
+
+```{r}
+m1 <- glm(Survived~.-PassengerId-Name-Ticket-Cabin, data=train, family = "binomial")
+
+pander(m1)
+```
+
+##### Trim 1
+
+I then took only those variables that were significant in the everything model and ran another one.
+
+```{r}
+m2 <- glm(Survived~Sex+Pclass+Age, data=train, family = "binomial")
+
+pander(m2)
 ```
 
 
+Then I tested it's accuracy.  No matter what the results are, this is the model I'm using.  
+
+```{r}
+train1 <- filter(train, !is.na(Age), !is.na(Sex), !is.na(Pclass))
+
+fitted.results <- predict(m2,newdata=subset(train1,select=c("Sex","Pclass","Age")),type='response')
+fitted.results <- ifelse(fitted.results > 0.5,1,0)
+
+misClasificError <- mean(fitted.results != train1$Survived)
+print(paste('Accuracy',1-misClasificError))
+```
+
+Not bad I guess.  Only works if passenger has Age, Sex and Passenger class though.  Will only replace those submissions that have all the variables.  
+
+### Submission
+
+```{r}
+predict <- mutate(test, Survived = ifelse(predict(m2,newdata=subset(test,select=c("Sex","Pclass","Age")),type='response')>0.5,1,0))%>%select(PassengerId, Survived)%>%filter(!is.na(Survived))
+
+submission <- anti_join(submission, predict, by = "PassengerId")
+submission <- rbind(predict, submission)
+
+write_csv(submission, "submissionBS.csv")
+```
+
+We'll see how it works.  Much more i could have done, but good enough warm-up for semester.  
